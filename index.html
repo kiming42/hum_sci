@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>JUSTIN 太空奪蛋宇宙 v6.0 (模組化 + 故事溫習室)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 頂部導航列 -->
+  <div id="top-bar">
+    <div class="mode-group">
+      <button class="btn-main-view active" id="btn-view-game" onclick="switchMainView('game')">🎮 太空奪蛋遊戲</button>
+      <button class="btn-main-view" id="btn-view-study" onclick="switchMainView('study')">📖 故事溫習室 (Gemini 朗讀)</button>
+      <select id="subject-select" class="subj-dropdown" onchange="switchSubject(this.value)">
+        <option value="sci">🧪 科學科 (U2-U3)</option>
+        <option value="hum">🏛️ 人文科 (預留)</option>
+        <option value="mix">🔥 雙科混合</option>
+      </select>
+    </div>
+
+    <div class="stats-group" id="game-stats-bar">
+      <div class="stat-pill">💰 $<span id="ui-coins">10</span></div>
+      <div class="stat-pill income-pill">⚡ +$<span id="ui-income">0</span>/s</div>
+      <div class="stat-pill" id="pill-incubator" onclick="tryManualHatch()">🥚 孵化: <span id="ui-incubator">0/3</span></div>
+      <div class="stat-pill storage-pill" onclick="openShop()">📦 倉庫: <span id="ui-storage">0</span></div>
+      <button class="btn-ui" onclick="openShop()">🛒 基地總管</button>
+      <button class="btn-reset" onclick="openResetModal()">🔄 重設</button>
+    </div>
+  </div>
+
+  <!-- ==================== 視圖 1：太空奪蛋遊戲區 ==================== -->
+  <div id="view-game" class="main-view active">
+    <canvas id="gameCanvas" width="760" height="600"></canvas>
+
+    <!-- 虛擬搖桿與技能快捷鍵 -->
+    <div id="touch-controls">
+      <div id="joystick-zone"><div id="joystick-knob"></div></div>
+      <div id="skill-buttons">
+        <button class="skill-btn" onclick="useJetpack()">
+          <span>🚀 噴射翼</span>
+          <small id="ui-jetpack-cd">就緒</small>
+        </button>
+        <button class="skill-btn" onclick="useFreezeBomb()">
+          <span>❄️ 冰封彈</span>
+          <small id="ui-freeze-count">x1</small>
+        </button>
+        <button class="skill-btn" onclick="useDecoy()">
+          <span>🤖 誘餌</span>
+          <small id="ui-decoy-count">x0</small>
+        </button>
+        <button class="skill-btn" onclick="useTeleport()">
+          <span>🛸 回城</span>
+          <small id="ui-tele-count">x0</small>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 視圖 2：📖 Gemini 故事溫習室 ==================== -->
+  <div id="view-study" class="main-view">
+    <div class="study-container">
+      <div class="study-header">
+        <div>
+          <h2 style="margin:0; color:#ffcd75;">📖 JUSTIN 太空故事溫習室</h2>
+          <small style="color:#73eff7;">睇圖聽故事溫習科學與人文重點（支援 Gemini AI 講故仔語音 / 廣東話朗讀）</small>
+        </div>
+        <div class="api-box">
+          <input type="password" id="gemini-api-key" placeholder="選填：輸入 Gemini API Key 啟用 AI 講故事" />
+          <button class="btn-ui" onclick="saveApiKey()">儲存 Key</button>
+        </div>
+      </div>
+
+      <!-- 章節選擇器 -->
+      <div class="chapter-tabs" id="story-chapter-tabs"></div>
+
+      <!-- 故事書展示卡 (左圖右文 / 上圖下文) -->
+      <div class="story-card">
+        <div class="story-img-wrap">
+          <img id="story-img" src="" alt="溫習圖片" onerror="this.style.display='none'; document.getElementById('story-fallback-art').style.display='flex';" />
+          <div id="story-fallback-art" class="story-fallback">🧬</div>
+          <div class="story-page-indicator" id="story-page-num">第 1 / 5 頁</div>
+        </div>
+
+        <div class="story-content-wrap">
+          <div class="story-tag" id="story-tag">單元重點</div>
+          <h3 id="story-title">章節標題</h3>
+          <div class="story-text" id="story-text">故事內容載入中...</div>
+          <div class="story-keypoints" id="story-keypoints"></div>
+
+          <div class="story-controls">
+            <button class="btn-ui" style="background:#3b5dc9;" onclick="prevStoryPage()">⬅️ 上一頁</button>
+            <button class="btn-ui" style="background:#38b764; font-size:15px; padding:8px 18px;" id="btn-play-story" onclick="playStoryAudio()">🔊 聽 Gemini 講故事</button>
+            <button class="btn-ui" style="background:#ef7d57;" onclick="stopStoryAudio()">⏹️ 停止</button>
+            <button class="btn-ui" style="background:#3b5dc9;" onclick="nextStoryPage()">下一頁 ➡️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast">歡迎 JUSTIN 進入太空奪蛋宇宙 v6.0！</div>
+
+  <!-- 問答解鎖 Modal -->
+  <div class="modal-overlay" id="quiz-modal">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span id="quiz-title">🔓 偷蛋解鎖</span>
+        <button class="tts-mini" onclick="speakCurrentModalQ()">🔊 朗讀</button>
+      </div>
+      <div class="q-badge" id="quiz-cat">題型</div>
+      <div class="q-text" id="quiz-q">題目</div>
+      <div class="seq-slots" id="quiz-seq-slots" style="display:none;"></div>
+      <div class="opt-grid" id="quiz-opts"></div>
+      <div class="explain-box" id="quiz-explain"></div>
+    </div>
+  </div>
+
+  <!-- 基地總管 (孵化器 + 倉庫 + 合成進化 + 商店) Modal -->
+  <div class="modal-overlay" id="shop-modal">
+    <div class="modal-card" style="max-width:680px;">
+      <div class="modal-title">
+        <span>🛸 JUSTIN 太空基地總管 (孵化 & 倉庫 & 3合1進化 & 商店)</span>
+        <button class="btn-ui" onclick="closeShop()">關閉 ✖</button>
+      </div>
+
+      <!-- 1. 孵化槽 -->
+      <div class="section-box" style="border-color:#ffcd75;">
+        <div class="section-head">
+          <span style="color:#ffcd75;">🥚 太空孵化槽 (<span id="txt-inc-slots">3/3</span>) — 時間到請親手撳「破殼」！</span>
+          <button class="btn-ui" id="btn-expand-inc" onclick="buyUpgrade('expandInc')" style="background:#38b764;">➕ 擴充孵化槽 ($180)</button>
+        </div>
+        <div class="grid-list" id="incubator-list"></div>
+      </div>
+
+      <!-- 2. 未孵化蛋倉庫 -->
+      <div class="section-box" style="border-color:#c084fc;">
+        <div class="section-head">
+          <span style="color:#e9d5ff;">📦 未孵化蛋倉庫 (庫存: <span id="txt-storage-cnt">0</span> 隻)</span>
+        </div>
+        <div class="grid-list" id="storage-list"></div>
+      </div>
+
+      <!-- 3. 太空道具店 -->
+      <div style="font-weight:bold; color:#73eff7; text-align:left; margin-top:8px;">⚡ 太空裝備與道具店</div>
+      <div class="grid-list">
+        <div class="item-card"><div class="item-icon">👟</div><div><b>反重力跑鞋</b><br><small id="txt-speed-lv">Lv.1</small></div><button class="btn-ui" id="btn-buy-speed" onclick="buyUpgrade('speed')">💰 $150</button></div>
+        <div class="item-card"><div class="item-icon">🦾</div><div><b>機械抱蛋臂</b><br><small id="txt-carry-lv">Lv.1</small></div><button class="btn-ui" id="btn-buy-carry" onclick="buyUpgrade('carry')">💰 $200</button></div>
+        <div class="item-card"><div class="item-icon">❄️</div><div><b>時間冰封彈</b><br><small>冰封 4.5 秒</small></div><button class="btn-ui" onclick="buyUpgrade('freeze')">💰 $90</button></div>
+        <div class="item-card"><div class="item-icon">🤖</div><div><b>全息誘餌公仔</b><br><small>引開怪獸 5 秒</small></div><button class="btn-ui" onclick="buyUpgrade('decoy')">💰 $110</button></div>
+        <div class="item-card"><div class="item-icon">🛸</div><div><b>瞬間回城器</b><br><small>1秒飛返基地</small></div><button class="btn-ui" onclick="buyUpgrade('tele')">💰 $220</button></div>
+        <div class="item-card"><div class="item-icon">🛡️</div><div><b>數碼屏幕護盾</b><br><small id="txt-shield-cnt">自動免死</small></div><button class="btn-ui" onclick="buyUpgrade('shield')">💰 $130</button></div>
+        <div class="item-card"><div class="item-icon">⚡</div><div><b>孵化加速電池</b><br><small>全部蛋-30秒</small></div><button class="btn-ui" onclick="buyUpgrade('hatchboost')">💰 $100</button></div>
+        <div class="item-card"><div class="item-icon">💎</div><div><b>VIP 雙倍金幣</b><br><small>收入永久 x2</small></div><button class="btn-ui" id="btn-buy-double" onclick="buyUpgrade('double')">💰 $900</button></div>
+      </div>
+
+      <!-- 4. 神獸圖鑑與 3合1 黃金進化 -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+        <span style="font-weight:bold; color:#a7f070;">🦖 基地神獸圖鑑（儲齊3隻同款可合成 ✨黃金進化版 收入x3！）</span>
+        <button class="btn-ui" style="background:#f59e0b; color:#000;" onclick="mergeDuplicatePets()">✨ 一鍵合成黃金神獸</button>
+      </div>
+      <div class="grid-list" id="pet-grid"></div>
+    </div>
+  </div>
+
+  <!-- Double Confirm 重設 Modal -->
+  <div class="modal-overlay" id="reset-modal">
+    <div class="modal-card" style="border-color:#ef4444; max-width:440px;">
+      <div class="modal-title" style="color:#fca5a5;">
+        <span>⚠️ 重設遊戲進度 (Double Confirm)</span>
+        <button class="btn-ui" style="background:#475569;" onclick="closeResetModal()">取消</button>
+      </div>
+      <div id="reset-step-1">
+        <p>確定要重設 <b>JUSTIN</b> 嘅太空基地嗎？所有金幣、蛋倉庫同神獸將會清空！</p>
+        <div style="display:flex; gap:10px; margin-top:14px;">
+          <button class="btn-ui" style="background:#38b764; flex:1;" onclick="closeResetModal()">❌ 唔重設</button>
+          <button class="btn-reset" style="flex:1;" onclick="showResetStep2()">➡️ 下一步確認</button>
+        </div>
+      </div>
+      <div id="reset-step-2" style="display:none; background:#2a1215; border:2px dashed #ef4444; border-radius:12px; padding:12px; margin-top:10px;">
+        <p style="color:#fde047; font-weight:bold;">🚨 【最終確認】撳下面粒掣之後資料會永久歸零！</p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-ui" style="background:#38b764; flex:1;" onclick="closeResetModal()">✋ 保留進度</button>
+          <button class="btn-reset" style="background:#dc2626; color:#fff; flex:1;" onclick="executeHardReset()">💥 永久清空重設</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 載入模組化 JS 檔案 -->
+  <script src="data-quiz.js"></script>
+  <script src="data-story.js"></script>
+  <script src="game-engine.js"></script>
+</body>
+</html>
